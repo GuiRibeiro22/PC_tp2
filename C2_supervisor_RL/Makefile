@@ -39,7 +39,7 @@
 ###
 ### ---- C++ Sources ----
 ### if your program uses several C++ source files:
-CXX_SOURCES = C2_supervisorRL.cpp
+CXX_SOURCES = C2_supervisor_RL.cpp
 ###
 ### ---- Compilation options ----
 ### if special compilation flags are necessary:
