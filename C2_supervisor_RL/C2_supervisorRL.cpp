@@ -12,8 +12,6 @@
 #include <sys/types.h>
 #include <signal.h>
 
-
-
 #include <QFile>
 #include <QXmlSimpleReader>
 #include <QXmlInputSource>
@@ -23,19 +21,6 @@
 // Define the default maximum duration of the simulation in seconds
 // This value can be overridden by the envoronment variable MAX_TIME
 // Example: export MAX_TIME=60
-
-
-// New stuff: --------------------------
-
-namespace webots {
-  class Emitter : public Device {
-    virtual int send(const void *data, int size);
-  }
-}
-
-// -------------------------------------------
-
-
 double MAX_TIME_SECONDS = 200.0;
 
 #define M_PI 3.14159265358979323846
@@ -158,8 +143,28 @@ void update_score()
         nextPathInd++;
         if (nextPathInd >= nCellPath)
             nextPathInd = 0;
-        scoreControl += 10;
+        scoreControl += 1;
     }
+}
+
+void resetEnvironment(Supervisor *supervisor, Node *robot_node, cbLabHandler *labHandler) {
+    // Reset robot position
+    webots::Field *translationField = epuck_node->getField("translation");
+    if (translationField) {
+        double newTranslation[3] = {labHandler->getLab()->Target(0)->Center().x, 
+                                    labHandler->getLab()->Target(0)->Center().y, 
+                                    0.0}; 
+        translationField->setSFVec3f(newTranslation);
+    }
+
+    // Reset robot orientation
+    webots::Field *rotationField = epuck_node->getField("rotation");
+    if (rotationField){
+        double rotation[4] = {0,0,1,0}; 
+        rotationField->setSFRotation(rotation);
+    }
+
+    scoreControl = 0;
 }
 
 int main(int argc, char **argv)
@@ -170,7 +175,10 @@ int main(int argc, char **argv)
     webots::Supervisor *supervisor = new webots::Supervisor();
     int timeStep = (int)supervisor->getBasicTimeStep();
 
-    webots::Emitter *emitter = new webots::Emitter();
+    webots::Emitter *emitter = supervisor->getEmitter("emitter");  
+    webots::Receiver *receiver = supervisor->getReceiver("receiver");
+
+    receiver->enable(timeStep);
 
     // ---
     // 1a. GET MAXIMUM SIMULATION TIME
@@ -282,21 +290,28 @@ int main(int argc, char **argv)
         // Check if the simulation time has exceeded the maximum duration.
         if (currentTime >= MAX_TIME_SECONDS)
         {
-            // The argument 0 indicates a successful exit.
             scoreText = "Final Score: " + std::to_string(scoreControl);
-
-            char message[128];
-            sprintf(message, "hello%d", i);
-            std::cerr << "Sent score!";
-            emitter.send("score", message, strlen(message) + 1);
         }
         else {
             // Increment the score (this is just an example, replace with your logic)
             update_score();
             scoreText = "Score: " + std::to_string(scoreControl);
+
+            if (receiver->getQueueLength() > 0){
+                const char *message = static_cast<const char *>(receiver->getData());
+                
+                std::cout << message << std::endl;
+
+                emitter->send(&scoreControl, sizeof(scoreControl));
+                
+                receiver->nextPacket();
+                
+           
+
+            }
+            
         }
 
-        // Display the label
         supervisor->setLabel(0, scoreText, 0.6, 0.01, 0.1, 0xFF0000, 0.0, "Arial");
     }
 
