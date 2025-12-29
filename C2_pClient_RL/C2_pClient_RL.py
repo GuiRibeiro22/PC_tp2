@@ -129,24 +129,47 @@ def update_Q(state, action, reward, next_state):
     Q[(state, action)] = old + ALPHA * (reward + GAMMA * next_max - old)
 
 
+def next_color(seen_color):
+    if seen_color == 'red':
+        previous_color = 'yellow'
+        expected_color = 'blue'
+
+    elif seen_color == 'blue':
+        previous_color = 'red'
+        expected_color = 'yellow'
+
+    elif seen_color == 'yellow':
+        previous_color = 'blue'
+        expected_color = 'red'
+
+    return (expected_color,previous_color)
+
 
 
 print("Started")
 
-current_state = get_state()
-old_reward = 0
+
 ACTION_STEPS = 5
 NUM_EPISODES = 20
+
 
 while robot.step(timeStep) != -1:
 
     for episode in range(NUM_EPISODES):
+
+        expected_color = 'blue'
+        previous_color = 'red'
+        seen_color = 'green'
+        old_reward = 0
+        current_state = get_state()
 
         
         print(f"Episode number {episode}\n")
         done = False
 
         while not done:
+
+            local_reward = 0
 
             current_state = get_state()
             #print("Current state: ",current_state)
@@ -164,15 +187,50 @@ while robot.step(timeStep) != -1:
                 robot.step(timeStep)
 
             # Aqui recebemos um reward ------------------------
-            #emitter.send("Action done")
+            emitter.send("Action done")
             #print("Emitter sent: Action done")
+            dist_sensor_values = [g.getValue() for g in dist_sensors]
+
+            for dist_sensor_value in dist_sensor_values:
+                if dist_sensor_value > 2*DANGER_DISTANCE:
+                    local_reward -= dist_sensor_value/DANGER_DISTANCE
+
+            if current_action == "Forward":
+                local_reward += 1
+
+            else:
+                local_reward += 0.1
+
+            
+            camera_values = camera.getImageArray()
+
+            r, g, b = camera_values[16][16]
+
+            if r > 230 and g > 230:
+                seen_color = 'yellow'
+            elif r > 230 and g < 150 and b < 150:
+                seen_color = 'red'
+            elif b > 230 and r < 150 and g < 150:
+                seen_color = 'blue'
+
+
+            if seen_color == expected_color:
+                local_reward += 10
+                (expected_color,previous_color) = next_color(seen_color)
+
+            elif seen_color == previous_color:
+                local_reward -= 5
+
+
             
             if receiver.getQueueLength() > 0:
 
                 if receiver.getInts()[0] < 2000:
                     reward = receiver.getInts()[0]
-                    final_reward = reward - old_reward
-                    #print(final_reward)
+
+
+                    final_reward = 5*reward - 5*old_reward + local_reward
+                    print(final_reward)
 
                 # ---------------------------------------------------
 
