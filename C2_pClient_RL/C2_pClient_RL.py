@@ -141,44 +141,57 @@ NUM_EPISODES = 20
 while robot.step(timeStep) != -1:
 
     for episode in range(NUM_EPISODES):
+
+        
+        print(f"Episode number {episode}\n")
         done = False
 
         while not done:
 
             current_state = get_state()
-            print("Current state: ",current_state)
+            #print("Current state: ",current_state)
 
 
             PossibleActions = Enable_Actions()
-            print("Possible actions: ", PossibleActions)
+            #print("Possible actions: ", PossibleActions)
 
             current_action = choose_action(current_state,PossibleActions)
             perform_action(current_action)
-            print("Action performed: ", current_action)
+            #print("Action performed: ", current_action)
 
             # step simulation for the action to take effect
             for _ in range(ACTION_STEPS):
                 robot.step(timeStep)
 
             # Aqui recebemos um reward ------------------------
-            emitter.send("Action done")
+            #emitter.send("Action done")
             #print("Emitter sent: Action done")
             
             if receiver.getQueueLength() > 0:
-                reward = receiver.getInts()[0]
-                final_reward = reward - old_reward
-                print(final_reward)
 
-            # ---------------------------------------------------
+                if receiver.getInts()[0] < 2000:
+                    reward = receiver.getInts()[0]
+                    final_reward = reward - old_reward
+                    #print(final_reward)
 
-                next_state = get_state()
-                update_Q(current_state,current_action,final_reward,next_state)
+                # ---------------------------------------------------
 
-                current_state = next_state
-                old_reward = reward
+                    next_state = get_state()
+                    update_Q(current_state,current_action,final_reward,next_state)
+
+                    current_state = next_state
+                    old_reward = reward
 
 
-                receiver.nextPacket()
+                    receiver.nextPacket()
+                
+                else:
+                    message = receiver.getString()
+                    print(message)
+
+                    receiver.nextPacket()
+
+                    done = True
 
 
 
