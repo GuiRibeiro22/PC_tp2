@@ -149,7 +149,7 @@ void resetEnvironment(webots::Node *epuck_node, cbLabHandler *labHandler, webots
     // Reset robot position
     const char *string = "Reset";
     
-    emitter->send(&string, sizeof(string));
+    emitter->send(string, sizeof(string));
     
     epuck_node->resetPhysics();
     
