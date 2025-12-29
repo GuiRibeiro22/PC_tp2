@@ -21,7 +21,7 @@
 // Define the default maximum duration of the simulation in seconds
 // This value can be overridden by the envoronment variable MAX_TIME
 // Example: export MAX_TIME=60
-double MAX_TIME_SECONDS = 20.0;
+double MAX_TIME_SECONDS = 200.0;
 
 #define M_PI 3.14159265358979323846
 
@@ -96,6 +96,8 @@ void build_cell_path(cbLab *lab)
 
     fprintf(stderr, "::: %d, %d %d %f\n", controlCellPath[0].x, controlCellPath[0].y, lab->nTargets(), lab->Target(0)->Center().x);
 
+    //controlCellPath[0].x = 1;
+    //controlCellPath[0].y = 5;
     struct cell_t newCell = controlCellPath[0];
     newCell.x++;
     nCellPath = 1;
@@ -145,14 +147,8 @@ void update_score()
     }
 }
 
-void resetEnvironment(webots::Node *epuck_node, cbLabHandler *labHandler, webots::Supervisor *supervisor, webots::Emitter *emitter) {
+void resetEnvironment(Supervisor *supervisor, Node *robot_node, cbLabHandler *labHandler) {
     // Reset robot position
-    const char *string = "Reset";
-    
-    emitter->send(&string, sizeof(string));
-    
-    epuck_node->resetPhysics();
-    
     webots::Field *translationField = epuck_node->getField("translation");
     if (translationField) {
         double newTranslation[3] = {labHandler->getLab()->Target(0)->Center().x, 
@@ -169,8 +165,6 @@ void resetEnvironment(webots::Node *epuck_node, cbLabHandler *labHandler, webots
     }
 
     scoreControl = 0;
-    nextPathInd = 0;
-    
 }
 
 int main(int argc, char **argv)
@@ -276,34 +270,27 @@ int main(int argc, char **argv)
     // ---
     // 4. MAIN LOOP (Optional)
     // ---
-   
 
     // The main work is done, but the controller must keep running
     // for the simulation to continue.
-    
-    double episodeStartTime = supervisor->getTime();
-    
     while (supervisor->step(timeStep) != -1)
     {
+        // Get the current simulation time.
+        double currentTime = supervisor->getTime();
 
         if (robot_pid > 0 && !is_pid_running(robot_pid)) {
-            printf("Robot controller finished at time %f.\n", episodeStartTime);
+            printf("Robot controller finished at time %f.\n", currentTime);
             
             //supervisor->simulationQuit(0); 
             break;
         }
 
         std::string scoreText;
-        double currentTime = supervisor->getTime();
-        double episodeTime = currentTime - episodeStartTime;
-        
+
         // Check if the simulation time has exceeded the maximum duration.
-        if (episodeTime >= MAX_TIME_SECONDS)
+        if (currentTime >= MAX_TIME_SECONDS)
         {
             scoreText = "Final Score: " + std::to_string(scoreControl);
-            resetEnvironment(epuck_node, labHandler, supervisor, emitter);      
-            episodeStartTime = supervisor->getTime();  // reset episode timer
-        
         }
         else {
             // Increment the score (this is just an example, replace with your logic)
@@ -316,17 +303,18 @@ int main(int argc, char **argv)
                 std::cout << message << std::endl;
 
                 emitter->send(&scoreControl, sizeof(scoreControl));
-                               
+                
                 receiver->nextPacket();
                 
            
+
             }
             
         }
 
         supervisor->setLabel(0, scoreText, 0.6, 0.01, 0.1, 0xFF0000, 0.0, "Arial");
     }
-    
+
     delete supervisor;
     return 0;
 }
