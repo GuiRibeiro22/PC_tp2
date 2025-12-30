@@ -2,10 +2,8 @@ from controller import Robot,Receiver,Emitter
 import random
 import time
 
-# create the Robot instance.
 robot = Robot()
 
-# Get simulation step length.
 timeStep = int(robot.getBasicTimeStep())
 
 cruiseVelocity = 5.0
@@ -23,7 +21,6 @@ leftMotor.setPosition(float('inf'))
 rightMotor.setPosition(float('inf'))
 
 
-# Set the initial velocity of the left and right wheel motors.
 leftMotor.setVelocity(cruiseVelocity)
 rightMotor.setVelocity(cruiseVelocity)
 
@@ -42,8 +39,10 @@ ALPHA = 0.5
 GAMMA = 0.9
 EPSILON = 0.1
 
-NEAR_WALL = 100
+NEAR_WALL = 90
 DANGER_DISTANCE = 300
+ACTION_STEPS = 5
+NUM_EPISODES = 20
 
 reset = False
 
@@ -73,21 +72,28 @@ def perform_action(action):
 
 
 
-def get_state():
+def get_state(lastaction,seencolor):
     Result = []
     dist_sensor_values = [g.getValue() for g in dist_sensors]
     for dist_sensor_value in dist_sensor_values:
-        if dist_sensor_value >= NEAR_WALL:
+        if dist_sensor_value < NEAR_WALL:
             Result.append(0)
-        else:
+        elif dist_sensor_value < DANGER_DISTANCE/2:
             Result.append(1)
+        elif dist_sensor_value < DANGER_DISTANCE:
+            Result.append(2)
+        else:
+            Result.append(3)
 
-    return tuple(Result)
+    return (tuple(Result),lastaction,seen_color)
     
+
+
 
 def Enable_Actions():
     dist_sensor_values = [g.getValue() for g in dist_sensors]
     EnabledActions = []
+    #print(dist_sensor_values)
 
     if dist_sensor_values[0] > DANGER_DISTANCE or dist_sensor_values[7] > DANGER_DISTANCE:
         EnabledActions += ["Back"]
@@ -113,6 +119,8 @@ def Enable_Actions():
 
     return EnabledActions
 
+
+
 def choose_action(state,PossibleActions):
     if random.random() < EPSILON:
         return random.choice(PossibleActions)
@@ -122,11 +130,15 @@ def choose_action(state,PossibleActions):
     return random.choice([a for a, q in zip(PossibleActions, qs) if q == max_q])
 
 
+
+
 def update_Q(state, action, reward, next_state):
     old = Q.get((state, action), 0.0)
     next_possible = Enable_Actions()
     next_max = max(Q.get((next_state, a), 0.0) for a in next_possible)
     Q[(state, action)] = old + ALPHA * (reward + GAMMA * next_max - old)
+
+
 
 
 def next_color(seen_color):
@@ -146,14 +158,13 @@ def next_color(seen_color):
 
 
 
-print("Started")
 
 
-ACTION_STEPS = 5
-NUM_EPISODES = 20
 
 
 while robot.step(timeStep) != -1:
+
+    print("Started")
 
     for episode in range(NUM_EPISODES):
 
@@ -161,7 +172,8 @@ while robot.step(timeStep) != -1:
         previous_color = 'red'
         seen_color = 'green'
         old_reward = 0
-        current_state = get_state()
+        lastaction = 'Forward'
+        current_state = get_state(lastaction,seen_color)
 
         
         print(f"Episode number {episode}\n")
@@ -171,16 +183,16 @@ while robot.step(timeStep) != -1:
 
             local_reward = 0
 
-            current_state = get_state()
-            #print("Current state: ",current_state)
+            current_state = get_state(lastaction,seen_color)
+            print("Current state: ",current_state)
 
 
             PossibleActions = Enable_Actions()
-            #print("Possible actions: ", PossibleActions)
 
             current_action = choose_action(current_state,PossibleActions)
             perform_action(current_action)
-            #print("Action performed: ", current_action)
+
+            lastaction = current_action
 
             # step simulation for the action to take effect
             for _ in range(ACTION_STEPS):
@@ -188,30 +200,36 @@ while robot.step(timeStep) != -1:
 
             # Aqui recebemos um reward ------------------------
             emitter.send("Action done")
-            #print("Emitter sent: Action done")
             dist_sensor_values = [g.getValue() for g in dist_sensors]
 
             for dist_sensor_value in dist_sensor_values:
-                if dist_sensor_value > 2*DANGER_DISTANCE:
+                if dist_sensor_value > 1.5*DANGER_DISTANCE:
                     local_reward -= dist_sensor_value/DANGER_DISTANCE
 
             if current_action == "Forward":
                 local_reward += 1
-
+            elif current_action == "MediumLeft" or current_action == "MediumRight":
+                local_reward += 1
+            elif current_action == "Left" or current_action == "Right":
+                local_reward += 0.5
             else:
                 local_reward += 0.1
 
             
             camera_values = camera.getImageArray()
+            #print(camera_values[16][16])
 
             r, g, b = camera_values[16][16]
 
             if r > 230 and g > 230:
-                seen_color = 'yellow'
+                color = 'yellow'
             elif r > 230 and g < 150 and b < 150:
-                seen_color = 'red'
+                color = 'red'
             elif b > 230 and r < 150 and g < 150:
-                seen_color = 'blue'
+                color = 'blue'
+            elif g > 230 and r < 150 and b < 150:
+                color = 'green'
+
 
 
             if seen_color == expected_color:
@@ -234,7 +252,7 @@ while robot.step(timeStep) != -1:
 
                 # ---------------------------------------------------
 
-                    next_state = get_state()
+                    next_state = get_state(lastaction,seen_color)
                     update_Q(current_state,current_action,final_reward,next_state)
 
                     current_state = next_state
@@ -245,7 +263,7 @@ while robot.step(timeStep) != -1:
                 
                 else:
                     message = receiver.getString()
-                    print(message)
+                    #print(message)
 
                     receiver.nextPacket()
 
