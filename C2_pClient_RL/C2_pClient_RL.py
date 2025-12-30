@@ -221,13 +221,13 @@ while robot.step(timeStep) != -1:
 
             r, g, b = camera_values[16][16]
 
-            if r > 230 and g > 230:
+            if r + g > 430:
                 color = 'yellow'
-            elif r > 230 and g < 150 and b < 150:
+            elif r > 230:
                 color = 'red'
-            elif b > 230 and r < 150 and g < 150:
+            elif b > 230:
                 color = 'blue'
-            elif g > 230 and r < 150 and b < 150:
+            else:
                 color = 'green'
 
 
