@@ -2,6 +2,7 @@ from controller import Robot,Receiver,Emitter
 import random
 import time
 
+
 robot = Robot()
 
 timeStep = int(robot.getBasicTimeStep())
@@ -40,7 +41,7 @@ GAMMA = 0.9
 EPSILON = 0.1
 
 NEAR_WALL = 90
-DANGER_DISTANCE = 300
+DANGER_DISTANCE = 250
 ACTION_STEPS = 5
 NUM_EPISODES = 20
 
@@ -72,7 +73,7 @@ def perform_action(action):
 
 
 
-def get_state(lastaction,seencolor):
+def get_state(lastaction,color_path):
     Result = []
     dist_sensor_values = [g.getValue() for g in dist_sensors]
     for dist_sensor_value in dist_sensor_values:
@@ -85,7 +86,7 @@ def get_state(lastaction,seencolor):
         else:
             Result.append(3)
 
-    return (tuple(Result),lastaction,seen_color)
+    return (tuple(Result),lastaction,color_path)
     
 
 
@@ -158,10 +159,6 @@ def next_color(seen_color):
 
 
 
-
-
-
-
 while robot.step(timeStep) != -1:
 
     print("Started")
@@ -170,10 +167,12 @@ while robot.step(timeStep) != -1:
 
         expected_color = 'blue'
         previous_color = 'red'
+        color_path = previous_color
         seen_color = 'green'
+
         old_reward = 0
         lastaction = 'Forward'
-        current_state = get_state(lastaction,seen_color)
+        current_state = get_state(lastaction,color_path)
 
         
         print(f"Episode number {episode}\n")
@@ -183,7 +182,7 @@ while robot.step(timeStep) != -1:
 
             local_reward = 0
 
-            current_state = get_state(lastaction,seen_color)
+            current_state = get_state(lastaction,color_path)
             print("Current state: ",current_state)
 
 
@@ -208,36 +207,40 @@ while robot.step(timeStep) != -1:
 
             if current_action == "Forward":
                 local_reward += 1
-            elif current_action == "MediumLeft" or current_action == "MediumRight":
-                local_reward += 1
-            elif current_action == "Left" or current_action == "Right":
-                local_reward += 0.5
             else:
-                local_reward += 0.1
+                local_reward += 0.5
 
             
             camera_values = camera.getImageArray()
-            #print(camera_values[16][16])
 
             r, g, b = camera_values[16][16]
 
-            if r + g > 430:
-                color = 'yellow'
-            elif r > 230:
-                color = 'red'
-            elif b > 230:
-                color = 'blue'
+            print(f"r g b : {r,g,b}")
+
+            if (r+g) > 500:
+                seen_color = 'yellow'
+            elif r > 250:
+                seen_color = 'red'
+            elif b > 250:
+                seen_color = 'blue'
             else:
-                color = 'green'
+                previous_color = color_path
+                seen_color = 'green'
 
 
 
             if seen_color == expected_color:
                 local_reward += 10
-                (expected_color,previous_color) = next_color(seen_color)
+                color_path = seen_color
+                (expected_color, previous_color) = next_color(seen_color)
 
             elif seen_color == previous_color:
-                local_reward -= 5
+                local_reward -= 10
+                color_path = previous_color
+                (color_path, _) = next_color(expected_color)
+
+
+            print(f"Color path: {color_path} , Expected Color: {expected_color}")
 
 
             
@@ -252,7 +255,7 @@ while robot.step(timeStep) != -1:
 
                 # ---------------------------------------------------
 
-                    next_state = get_state(lastaction,seen_color)
+                    next_state = get_state(lastaction,color_path)
                     update_Q(current_state,current_action,final_reward,next_state)
 
                     current_state = next_state
@@ -271,6 +274,9 @@ while robot.step(timeStep) != -1:
 
 
 
+    import pickle
 
+    with open("q_table.pkl", "wb") as f:
+        pickle.dump(Q, f)
     
     
