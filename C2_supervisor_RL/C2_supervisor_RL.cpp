@@ -21,7 +21,7 @@
 // Define the default maximum duration of the simulation in seconds
 // This value can be overridden by the envoronment variable MAX_TIME
 // Example: export MAX_TIME=60
-double MAX_TIME_SECONDS = 20.0;
+double MAX_TIME_SECONDS = 200.0;
 
 #define M_PI 3.14159265358979323846
 
@@ -32,6 +32,7 @@ struct cell_t
 
 int nCellPath = 0;
 int nextPathInd = 0;
+int previousPath = 0;
 int scoreControl = 0;
 
 // Get the e-puck node by DEF name (e.g., "EPUCK")
@@ -133,17 +134,59 @@ void build_cell_path(cbLab *lab)
     //  }
 }
 
+int lastPathInd = 0;
+
+
+int findClosestPathIndex(struct cell_t curCell)
+{
+    int best = -1;
+    int bestDist = INT_MAX;
+
+    for (int i = 0; i < nCellPath; i++) {
+        int dx = curCell.x - controlCellPath[i].x;
+        int dy = curCell.y - controlCellPath[i].y;
+        int dist = abs(dx) + abs(dy);
+
+        if (dist < bestDist) {
+            bestDist = dist;
+            best = i;
+        }
+    }
+    return best;
+}
+
 void update_score()
 {
     struct cell_t curCell = getRobotCell();
-    if (curCell.x == controlCellPath[nextPathInd].x && curCell.y == controlCellPath[nextPathInd].y)
-    {
-        nextPathInd++;
-        if (nextPathInd >= nCellPath)
-            nextPathInd = 0;
+    int curInd = findClosestPathIndex(curCell);
+
+    if (curInd < 0)
+        return;
+
+    int forwardDiff = (curInd - nextPathInd + nCellPath) % nCellPath;
+
+    if (forwardDiff == 0) {
+        // Still on the expected cell → no change
+        return;
+    }
+    else if (forwardDiff == 1) {
+        // Correct forward movement
+        scoreControl += 2;
+        nextPathInd = curInd;
+    }
+    else if (forwardDiff > 1 && forwardDiff < nCellPath / 2) {
+        // Jumped forward (still OK, but less ideal)
         scoreControl += 1;
+        nextPathInd = curInd;
+    }
+    else {
+        // Backward movement or wrong direction
+        scoreControl -= 1;
     }
 }
+
+
+
 
 void resetEnvironment(webots::Node *epuck_node, cbLabHandler *labHandler, webots::Supervisor *supervisor, webots::Emitter *emitter) {
     // Reset robot position
@@ -313,7 +356,7 @@ int main(int argc, char **argv)
             if (receiver->getQueueLength() > 0){
                 const char *message = static_cast<const char *>(receiver->getData());
                 
-                std::cout << message << std::endl;
+                //std::cout << message << std::endl;
 
                 emitter->send(&scoreControl, sizeof(scoreControl));
                                
