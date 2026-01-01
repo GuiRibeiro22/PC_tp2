@@ -2,8 +2,6 @@
  * world_builder C++ supervisor controller.
  */
 #include <webots/Supervisor.hpp>
-#include <webots/Emitter.hpp>
-#include <webots/Receiver.hpp>
 #include <iostream>
 #include <string>
 #include <math.h>
@@ -23,7 +21,7 @@
 // Define the default maximum duration of the simulation in seconds
 // This value can be overridden by the envoronment variable MAX_TIME
 // Example: export MAX_TIME=60
-double MAX_TIME_SECONDS = 25.0;
+double MAX_TIME_SECONDS = 200.0;
 
 #define M_PI 3.14159265358979323846
 
@@ -145,7 +143,7 @@ void update_score()
         nextPathInd++;
         if (nextPathInd >= nCellPath)
             nextPathInd = 0;
-        scoreControl += 1;
+        scoreControl += 10;
     }
 }
 
