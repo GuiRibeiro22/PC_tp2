@@ -167,11 +167,11 @@ void update_score()
 
     if (forwardDiff == 0) {
         // Still on the expected cell → no change
-        return;
+        scoreControl += 1;
     }
     else if (forwardDiff == 1) {
         // Correct forward movement
-        scoreControl += 2;
+        scoreControl += 3;
         nextPathInd = curInd;
     }
     else if (forwardDiff > 1 && forwardDiff < nCellPath / 2) {
@@ -181,7 +181,7 @@ void update_score()
     }
     else {
         // Backward movement or wrong direction
-        scoreControl -= 1;
+        scoreControl -= 5;
     }
 }
 
